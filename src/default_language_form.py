@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QDialog, QFileDialog
 
 from my_log import log_print
 from default_language import Ui_DefaultLanguageDialog
+from os_util import is_game_file
 
 default_language_template_path = 'default_langauge_template.txt'
 out_default_lanugage_script_name = 'set_default_language_at_startup.rpy'
@@ -16,7 +17,7 @@ def set_default_language_at_startup(tl_name, target):
         f = io.open(default_language_template_path, 'r', encoding='utf-8')
         _read = f.read()
         f.close()
-        _read = _read.replace('{language}', tl_name)
+        _read = _read.replace('{tl_name}', tl_name)
         f = io.open(target, 'w', encoding='utf-8')
         f.write(_read)
         f.close()
@@ -32,15 +33,6 @@ class MyDefaultLanguageForm(QDialog, Ui_DefaultLanguageDialog):
         self.selectFileBtn.clicked.connect(self.select_file)
         self.selectFileText.textChanged.connect(self.on_text_changed)
         self.addEntranceCheckBox.clicked.connect(self.on_add_entrance_checkbox_clicked)
-
-    def is_game_file(self, path):
-        if not path or not os.path.isfile(path):
-            return False
-        if path.endswith('.exe') or path.endswith('.sh'):
-            return True
-        if platform.system() == 'Linux' and os.access(path, os.X_OK):
-            return True
-        return False
 
     def on_add_entrance_checkbox_clicked(self):
         if self.addEntranceCheckBox.isChecked():
@@ -60,12 +52,11 @@ class MyDefaultLanguageForm(QDialog, Ui_DefaultLanguageDialog):
     def get_target(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if os.path.isfile(path):
-            if self.is_game_file(path):
-                target = os.path.join(os.path.dirname(path), 'game')
-                if os.path.isdir(target):
-                    target = os.path.join(target, out_default_lanugage_script_name)
-                    return target
+        if is_game_file(path):
+            target = os.path.join(os.path.dirname(path), 'game')
+            if os.path.isdir(target):
+                target = os.path.join(target, out_default_lanugage_script_name)
+                return target
         return None
 
     def on_text_changed(self):

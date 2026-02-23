@@ -183,13 +183,11 @@ class translateThread(threading.Thread):
             if is_replace_special_symbols:
                 translated = get_translated(trans_dic, d)
             else:
-                translated = trans_dic[target]
-            if translated is None:
-                translated = ''
-                encoded = d['encoded'].strip('"')
-                if encoded in trans_dic:
-                    translated = trans_dic[encoded]
-                log_print(f'{p} Error in line:{str(line)}\n{target}\n{encoded}\n{translated}\nError')
+                translated = trans_dic.get(target)
+            if translated is None or len(translated) == 0:
+                encoded = d['encoded'].strip('"') if d and 'encoded' in d else 'N/A'
+                log_print(f'{p} Translation failed or returned empty for line {str(line+1)}. Target: {target}. Encoded: {encoded}. Keeping original text.')
+                continue
             else:
                 if target == current:
                     if _read_lines[line].startswith('    new '):
@@ -324,7 +322,9 @@ def init_client():
 def get_translated(trans_dic, d):
     try:
         if not isAllPunctuations(d['encoded'].strip('"')):
-            translated = trans_dic[d['encoded'].strip('"')]
+            translated = trans_dic.get(d['encoded'].strip('"'))
+            if translated is None:
+                return None
             translated = translated.replace('\u200b', '')
             translated = translated.replace('\u200b1', '')
             # translated = translated.replace('"', '\\"')
@@ -506,13 +506,11 @@ def get_translated_dic(html_path, translated_path):
             translated = translated_strings[i]
             translated_dic[target] = translated
             translated = get_translated(translated_dic, d)
-            if translated is None:
-                translated = ''
-                encoded = d['encoded'].strip('"')
-                if encoded in translated_dic:
-                    translated = translated_dic[encoded]
+            if translated is None or len(translated) == 0:
                 log_print(
-                    f'{translated_path} Error in line:{str(i + 1)} row:{line}\n{target}\n{encoded}\n{translated}\nError')
+                    f'{translated_path} Translation failed or returned empty in line:{str(i + 1)} row:{line}. Keeping original text.')
+                dic[ori_strings[i]] = ori_strings[i]
+                continue
             dic[ori_strings[i]] = translated
     else:
         for i, e in enumerate(ori_strings):
@@ -548,7 +546,7 @@ def web_brower_translate(is_open_filter, filter_length, is_current, is_replace_s
         else:
             if target_key in dic.keys():
                 replaced = dic[target_key]
-        if replaced is None:
+        if replaced is None or len(replaced) == 0:
             translated = ''
             if target_key in dic:
                 translated = dic[target_key]
@@ -564,7 +562,7 @@ def web_brower_translate(is_open_filter, filter_length, is_current, is_replace_s
                 if is_open_filter:
                     if len(_strip_i) < filter_length:
                         continue
-            log_print(f'{path} Error in line:{str(line)}\n{target}\n{target_key}\n{translated}\nError')
+            log_print(f'{path} Translation failed or returned empty in line:{str(line+1)}. Keeping original text.')
             continue
         if _read_lines[line].startswith('    new '):
             header = _read_lines[line][:7]

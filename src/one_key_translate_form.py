@@ -40,7 +40,7 @@ from font_replace_form import replaceFontThread
 import default_language_form
 from error_repair_form import repairThread
 from translated_form import MyTranslatedForm
-from os_util import get_subprocess_creation_flags
+from os_util import get_subprocess_creation_flags, is_game_file
 
 
 class MyQueue(queue.Queue):
@@ -108,15 +108,6 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
         self.overwriteCheckBox.setChecked(not is_skip_if_exist)
         _thread.start_new_thread(self.update, ())
 
-    def is_game_file(self, path):
-        if not path or not os.path.isfile(path):
-            return False
-        if path.endswith('.exe') or path.endswith('.sh'):
-            return True
-        if platform.system() == 'Linux' and os.access(path, os.X_OK):
-            return True
-        return False
-
     def on_tl_path_changed(self):
         if os.path.isfile('engine.txt'):
             json_file = open('engine.txt', 'r',encoding='utf-8')
@@ -164,7 +155,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
     def repair(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if self.is_game_file(path):
+        if is_game_file(path):
             t = repairThread(path, int(self.maxRecursionLineEdit.text()))
             self.repair_thread = t
             t.start()
@@ -181,7 +172,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
     def get_set_default_language_target(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if self.is_game_file(path):
+        if is_game_file(path):
             target = os.path.dirname(path)
             target = os.path.join(target, 'game')
             if os.path.isdir(target):
@@ -201,7 +192,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                 is_finished = True
                 self.qDic[self.official_extract] = is_finished, is_executed
                 return
-            if self.is_game_file(select_file):
+            if is_game_file(select_file):
                 t = extraction_official_form.extractThread(select_file, tl_name, False, False)
                 self.official_extract_thread = t
                 t.start()
@@ -293,7 +284,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
     def get_add_entrance_target(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if self.is_game_file(path):
+        if is_game_file(path):
             target = os.path.dirname(path)
             target = os.path.join(target, 'game')
             if os.path.isdir(target):
@@ -398,7 +389,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
             is_finished = True
             self.qDic[self.runtime_extract] = is_finished, is_executed
             return
-        if self.is_game_file(path):
+        if is_game_file(path):
             is_finished, is_executed = self.qDic[self.runtime_extract]
             is_finished = False
             self.qDic[self.runtime_extract] = is_finished, is_executed
@@ -425,7 +416,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
     def unpack(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if self.is_game_file(path):
+        if is_game_file(path):
             dir = os.path.dirname(path)
             #shutil.copyfile(game_unpacker_form.hook_script, dir + '/game/' + game_unpacker_form.hook_script)
             f = io.open(game_unpacker_form.hook_script, mode='r', encoding='utf-8')
@@ -451,7 +442,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
             f.close()
             command = '"' +path+'"'
             self.path = path
-            f = io.open(os.path.join(dir, finish_flag), 'w')
+            f = io.open(os.path.join(dir, finish_flag.lstrip('/')), 'w')
             f.write('waiting')
             f.close()
             self.setDisabled(True)
@@ -659,7 +650,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                         self.qDic[self.runtime_extract] = is_finished, is_executed
             if self.path is not None:
                 dir = os.path.dirname(self.path)
-                target = os.path.join(dir, finish_flag)
+                target = os.path.join(dir, finish_flag.lstrip('/'))
                 if not os.path.isfile(target):
                     hook_script_path = os.path.join(dir, 'game', game_unpacker_form.hook_script)
                     if os.path.isfile(hook_script_path):
@@ -667,7 +658,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                     if os.path.isfile(hook_script_path + 'c'):
                         os.remove(hook_script_path + 'c')
                     pid = None
-                    target = os.path.join(dir, game_unpacker_form.pid_flag)
+                    target = os.path.join(dir, game_unpacker_form.pid_flag.lstrip('/'))
                     if os.path.isfile(target):
                         f = io.open(target, 'r', encoding='utf-8')
                         pid = f.read()
@@ -740,7 +731,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                                                 paths = os.walk(self.select_dir, topdown=False)
                                                 for path, dir_lst, file_lst in paths:
                                                     for file_name in file_lst:
-                                                        i = os.path.join(path, file_name)
+                                                        i = path + '/' + file_name
                                                         if not file_name.endswith("rpy"):
                                                             continue
                                                         if i in rpy_info_dic.keys():

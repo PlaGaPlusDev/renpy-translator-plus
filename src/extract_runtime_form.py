@@ -16,7 +16,7 @@ from extraction_runtime import Ui_ExtractionRuntimeDialog
 from my_log import log_print
 from html_util import open_directory_and_select_file
 from string_tool import encode_say_string
-from os_util import get_subprocess_creation_flags
+from os_util import get_subprocess_creation_flags, is_game_file
 
 hook_script = 'hook_extract.rpy'
 hooked_result = 'extraction_hooked.json'
@@ -161,15 +161,6 @@ class MyExtractionRuntimeForm(QDialog, Ui_ExtractionRuntimeDialog):
         self.extractBtn.clicked.connect(self.extract)
         _thread.start_new_thread(self.update, ())
 
-    def is_game_file(self, path):
-        if not path or not os.path.isfile(path):
-            return False
-        if path.endswith('.exe') or path.endswith('.sh'):
-            return True
-        if platform.system() == 'Linux' and os.access(path, os.X_OK):
-            return True
-        return False
-
     def extract(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
@@ -177,7 +168,7 @@ class MyExtractionRuntimeForm(QDialog, Ui_ExtractionRuntimeDialog):
         if len(tl_name) == 0:
             log_print('tl_name should not be empty')
             return
-        if self.is_game_file(path):
+        if is_game_file(path):
             t = extractThread(path, tl_name, self.emptyCheckBox.isChecked(), True)
             t.start()
             self.setDisabled(True)

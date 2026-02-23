@@ -40,11 +40,16 @@ def kill_process(pid):
         subprocess.call(['taskkill.exe', '/F', '/T', '/PID', str(pid)],
                         creationflags=0x08000000) # CREATE_NO_WINDOW
     else:
+        # On Linux, try to kill the process group to include children
         try:
             import signal
-            os.kill(int(pid), signal.SIGKILL)
+            os.killpg(os.getpgid(int(pid)), signal.SIGKILL)
         except Exception:
-            subprocess.call(['kill', '-9', str(pid)])
+            try:
+                import signal
+                os.kill(int(pid), signal.SIGKILL)
+            except Exception:
+                subprocess.call(['kill', '-9', str(pid)])
 
 def get_system_language():
     """Returns the system language code."""
@@ -137,3 +142,14 @@ def open_file_with_text_editor(filepath):
                 subprocess.Popen(['xdg-open', filepath])
             except Exception:
                 pass
+
+def is_game_file(path):
+    """Checks if a path is a valid Ren'Py game launcher."""
+    if not path or not os.path.isfile(path):
+        return False
+    lower_path = path.lower()
+    if lower_path.endswith('.exe') or lower_path.endswith('.sh'):
+        return True
+    if platform.system() == 'Linux' and os.access(path, os.X_OK):
+        return True
+    return False

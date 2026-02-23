@@ -14,7 +14,7 @@ from html_util import open_directory_and_select_file
 from extraction_official import Ui_ExtractionOfficialDialog
 from call_game_python import get_python_path_from_game_path, get_py_path
 import my_log
-from os_util import get_subprocess_creation_flags
+from os_util import get_subprocess_creation_flags, is_game_file
 
 
 class extractThread(threading.Thread):
@@ -34,7 +34,7 @@ class extractThread(threading.Thread):
             exec_official_translate(self.path, tl_name, is_gen_empty)
             log_print('official extraction complete!')
             if is_show_directory:
-                show_dir = os.path.join(os.path.dirname(self.path), 'game/tl', tl_name)
+                show_dir = os.path.join(os.path.dirname(self.path), 'game', 'tl', tl_name)
                 open_directory_and_select_file(show_dir)
 
         except Exception as e:
@@ -53,15 +53,6 @@ class MyExtractionOfficialForm(QDialog, Ui_ExtractionOfficialDialog):
         self.extract_thread = None
         _thread.start_new_thread(self.update, ())
 
-    def is_game_file(self, path):
-        if not path or not os.path.isfile(path):
-            return False
-        if path.endswith('.exe') or path.endswith('.sh'):
-            return True
-        if platform.system() == 'Linux' and os.access(path, os.X_OK):
-            return True
-        return False
-
     def extract(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
@@ -69,7 +60,7 @@ class MyExtractionOfficialForm(QDialog, Ui_ExtractionOfficialDialog):
         if len(tl_name) == 0:
             log_print('tl_name should not be empty')
             return
-        if self.is_game_file(path):
+        if is_game_file(path):
             t = extractThread(path, tl_name, self.emptyCheckBox.isChecked(), True)
             self.extract_thread = t
             t.start()

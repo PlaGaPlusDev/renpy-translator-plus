@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QDialog, QFileDialog
 
 from add_change_langauge_entrance import Ui_AddEntranceDialog
 from my_log import log_print
+from os_util import is_game_file
 
 hook_script = 'hook_add_change_language_entrance.rpy'
 
@@ -19,15 +20,6 @@ class MyAddChangeLanguageEntranceForm(QDialog, Ui_AddEntranceDialog):
         self.selectFileBtn.clicked.connect(self.select_file)
         self.selectFileText.textChanged.connect(self.on_text_changed)
         self.addEntranceCheckBox.clicked.connect(self.on_add_entrance_checkbox_clicked)
-
-    def is_game_file(self, path):
-        if not path or not os.path.isfile(path):
-            return False
-        if path.endswith('.exe') or path.endswith('.sh'):
-            return True
-        if platform.system() == 'Linux' and os.access(path, os.X_OK):
-            return True
-        return False
 
     def on_add_entrance_checkbox_clicked(self):
         if self.addEntranceCheckBox.isChecked():
@@ -47,7 +39,7 @@ class MyAddChangeLanguageEntranceForm(QDialog, Ui_AddEntranceDialog):
     def get_target(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if self.is_game_file(path):
+        if is_game_file(path):
             target = os.path.join(os.path.dirname(path), 'game')
             if os.path.isdir(target):
                 target = os.path.join(target, hook_script)
