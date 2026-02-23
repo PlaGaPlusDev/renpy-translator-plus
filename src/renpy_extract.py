@@ -50,11 +50,8 @@ class ExtractTlThread(threading.Thread):
 
 
 def remove_repeat_extracted_from_tl(tl_dir, is_py2):
-    p = tl_dir
-    if p[len(p) - 1] != '/' and p[len(p) - 1] != '\\':
-        p = p + '/'
     e = set()
-    paths = os.walk(p, topdown=False)
+    paths = os.walk(tl_dir, topdown=False)
     global get_extracted_threads
     global get_extracted_set_list
     global get_extracted_lock
@@ -83,12 +80,12 @@ def remove_repeat_extracted_from_tl(tl_dir, is_py2):
         for k in range(i + 1, len(get_extracted_set_list)):
             p1, set1 = get_extracted_set_list[i]
             p2, set2 = get_extracted_set_list[k]
+            if set1 is None or set2 is None:
+                continue
             both = set1 & set2
             if len(both) > 0:
                 is_modified1 = False
                 is_modified2 = False
-                dic1 = dict()
-                dic2 = dict()
                 f = io.open(p1, 'r', encoding='utf-8')
                 lines1 = f.readlines()
                 f.close()
@@ -111,18 +108,10 @@ def remove_repeat_extracted_from_tl(tl_dir, is_py2):
                         if not is_both_old_new_format:
                             continue
                         if _len1 < _len2:
-                            # log_print(
-                            #     'Repeated Text Found in ' + p1 + ' ' + str(_idx1) + ' : \n' + lines1[_idx1].rstrip(
-                            #         "\n") + '\n' +  lines1[_idx1 + 1].rstrip(
-                            #         "\n"))
                             lines1[_idx1] = ''
                             lines1[_idx1 + 1] = ''
                             is_modified1 = True
                         else:
-                            # log_print(
-                            #     'Repeated Text Found in ' + p2 + ' ' + str(_idx2) + ' : \n' + lines2[_idx2].rstrip(
-                            #         "\n") + '\n' + lines2[_idx2 + 1].rstrip(
-                            #         "\n"))
                             lines2[_idx2] = ''
                             lines2[_idx2 + 1] = ''
                             is_modified2 = True
@@ -168,9 +157,10 @@ def remove_repeat_for_file(p):
             if start_translate_block_line != -1:
                 if is_empty_translate:
                     is_removed = True
+                    idx_limit = index
                     if index == len(lines) - 1:
-                        index = index + 1
-                    for idx in range(start_translate_block_line, index - 1):
+                        idx_limit = index + 1
+                    for idx in range(start_translate_block_line, idx_limit - 1):
                         lines[idx] = ''
                 is_empty_translate = True
             start_translate_block_line = index
@@ -184,13 +174,11 @@ def remove_repeat_for_file(p):
             exist_set.add(line)
         else:
             if line.startswith('    old '):
-                if (index + 1) <= len(lines):
+                if (index + 1) < len(lines):
                     new_line = lines[index + 1]
                     if new_line.startswith('    new '):
                         if line.startswith('    old ') and index > 0 and lines[index - 1].lstrip().startswith('#'):
                             lines[index - 1] = ''
-                        # log_print('Remove Repeat in ' + p + ' ' + str(index) + ' : \n' + lines[index].rstrip(
-                        #     "\n") + '\n' + new_line.rstrip("\n"))
                         lines[index] = ''
                         lines[index + 1] = ''
                         is_removed = True
@@ -218,11 +206,10 @@ class extractThread(threading.Thread):
     def run(self):
         try:
             if self.tl_dir is not None and os.path.exists(self.tl_dir):
-                self.tl_dir = self.tl_dir.rstrip('/')
-                self.tl_dir = self.tl_dir.rstrip('\\')
+                self.tl_dir = self.tl_dir.rstrip('/').rstrip('\\')
                 if self.tl_name is not None and len(self.tl_name) > 0:
                     ori_tl = os.path.basename(self.tl_dir)
-                    self.tl_dir = self.tl_dir[:-len(ori_tl)] + self.tl_name
+                    self.tl_dir = os.path.join(os.path.dirname(self.tl_dir), self.tl_name)
                 log_print(self.tl_dir + ' begin extract!')
                 ExtractAllFilesInDir(self.tl_dir, self.is_open_filter, self.filter_length, self.is_gen_empty,
                                      self.is_skip_underline)
@@ -265,10 +252,12 @@ def is_path_or_dir_string(_string):
 def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2):
     remove_repeat_for_file(p)
     e = set()
-    f = io.open(p, 'r+', encoding='utf-8')
-    _read = f.read()
-    f.close()
-    # print(_read)
+    try:
+        f = io.open(p, 'r+', encoding='utf-8')
+        _read = f.read()
+        f.close()
+    except Exception:
+        return e
     _read_line = _read.split('\n')
     is_in_condition_switch = False
     is_in__p = False
@@ -278,7 +267,7 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
             if not line_content.strip().endswith(')'):
                 is_in_condition_switch = True
             continue
-        if _read_line[-1] == ')':
+        if index == len(_read_line) - 1 and line_content == ')':
             is_in_condition_switch = False
             continue
         if is_in_condition_switch:
@@ -304,7 +293,6 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
                 if is_py2:
                     p_content = p_content.strip()[6:-4]
                     p_content = p_content.rstrip('\n').replace('\n', '\\n')
-                # log_print(p_content)
                 if filter_length != 9999:
                     log_print(f'Found _p() in {p}:{index + 1}')
                 e.add(p_content)
@@ -317,7 +305,6 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
                 continue
             if line_content.strip().startswith('default '):
                 continue
-        # log_print(line_content)
         is_add = False
         d = EncodeBracketContent(line_content, '"', '"')
         if 'oriList' in d.keys() and len(d['oriList']) > 0:
@@ -333,7 +320,6 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
                     for j in (d2['en_3']):
                         strip_i = strip_i.replace(j, '')
 
-                    diff_len = len(i) - len(strip_i)
                     _strip_i = replace_all_blank(strip_i)
                     cmp_i = i.lower().strip('"')
                     skip = False
@@ -341,8 +327,6 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
                         skip = True
                     if is_skip_underline and strip_i.find('_') > -1:
                         skip = True
-                    # if not line_content.strip().startswith('text ') or line_content.strip().find(i) != 5:
-                    #     skip = True
                     if is_path_or_dir_string(cmp_i):
                         skip = True
                     if skip:
@@ -352,7 +336,6 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
                     i = i.replace("\\'", "'")
                     if is_open_filter:
                         if len(_strip_i) < filter_length:
-                            # log_print(len(strip_i),i)
                             continue
                         e.add(i)
                         is_add = True
@@ -375,7 +358,6 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
                     for j in (d2['en_3']):
                         strip_i = strip_i.replace(j, '')
 
-                    diff_len = len(i) - len(strip_i)
                     _strip_i = replace_all_blank(strip_i)
                     cmp_i = i.lower().strip("'")
                     skip = False
@@ -383,8 +365,6 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
                         skip = True
                     if is_skip_underline and _strip_i.find('_') > -1:
                         skip = True
-                    # if not line_content.strip().startswith('text ') or line_content.strip().find(i) != 5:
-                    #     skip = True
                     if is_path_or_dir_string(cmp_i):
                         skip = True
                     if skip:
@@ -394,7 +374,6 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
                     i = i.replace("\\'", "'")
                     if is_open_filter:
                         if len(_strip_i) < filter_length:
-                            # log_print(len(strip_i),i)
                             continue
                         e.add(i)
                     else:
@@ -403,49 +382,46 @@ def ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
 
 
 def CreateEmptyFileIfNotExsit(p):
-    if (p[len(p) - 1] != '/' and p[len(p) - 1] != '\\'):
-        p = p + '/'
-    paths = os.walk(p + '/../../', topdown=False)
+    base_search = os.path.join(p, '..', '..')
+    paths = os.walk(base_search, topdown=False)
 
     for path, dir_lst, file_lst in paths:
         for file_name in file_lst:
             i = os.path.join(path, file_name)
-            if (i[len(p + '/../../'):][:3] == 'tl\\'):
+            rel = os.path.relpath(i, base_search)
+            if rel.startswith('tl' + os.sep) or rel.startswith('tl/'):
                 continue
-            if (file_name.endswith("rpy") == False):
+            if not file_name.endswith("rpy"):
                 continue
-            target = p + i[len(p + '/../../'):]
+            target = os.path.join(p, rel)
             targetDir = os.path.dirname(target)
-            if os.path.exists(targetDir) == False:
-                pathlib.Path(targetDir).mkdir(parents=True, exist_ok=True)
-            if os.path.isfile(target) == False:
+            if not os.path.exists(targetDir):
+                os.makedirs(targetDir, exist_ok=True)
+            if not os.path.isfile(target):
                 open(target, 'w').close()
 
 
 def WriteExtracted(p, extractedSet, is_open_filter, filter_length, is_gen_empty, is_skip_underline, is_py2):
-    if (p[len(p) - 1] != '/' and p[len(p) - 1] != '\\'):
-        p = p + '/'
-    index = p.rfind('tl\\')
-    if index == -1:
-        index = p.rfind('tl/')
-    if (index == -1):
+    norm_p = os.path.normpath(p)
+    parts = norm_p.split(os.sep)
+    if 'tl' not in parts:
         log_print(p + ' no tl found!')
         return
-    index2 = p.find('\\', index + 3)
-    if index2 == -1:
-        index2 = p.find('/', index + 3)
-    if (index2 == -1):
-        log_print(p + ' no tl found2!')
-        return
-    tl = p[index + 3:index2]
+    index = parts.index('tl')
+    if index + 1 >= len(parts):
+         log_print(p + ' no tl found2!')
+         return
+    tl = parts[index + 1]
+
     paths = os.walk(p, topdown=False)
     for path, dir_lst, file_lst in paths:
         for file_name in file_lst:
             i = os.path.join(path, file_name)
-            if (file_name.endswith("rpy") == False):
+            if not file_name.endswith("rpy"):
                 continue
-            target = p + '../../' + i[len(p):]
-            if os.path.isfile(target) == False:
+            rel = os.path.relpath(i, p)
+            target = os.path.join(p, '..', '..', rel)
+            if not os.path.isfile(target):
                 log_print(target + " not exists skip!")
                 continue
 
@@ -480,23 +456,29 @@ def WriteExtracted(p, extractedSet, is_open_filter, filter_length, is_gen_empty,
 
 def GetHeaderPath(p):
     dic = dict()
-    index = p.rfind('game/')
-    if index == -1:
-        index = p.rfind('game//')
-    if index == -1:
+    norm_p = os.path.normpath(p)
+    if 'game' + os.sep not in norm_p and 'game/' not in norm_p:
         dic['header'] = ''
         return dic
-    header = p[:index]
-    if os.path.exists(header + 'renpy'):
-        dic['header'] = header + 'game/'
-        dirname = os.path.dirname(p) + '/'
-        subPath = dirname[len(header) + len('game/'):]
-        dic['subPath'] = subPath
-        dic['fileName'] = os.path.basename(p)
-        return dic
-    else:
-        dic['header'] = ''
-        return dic
+
+    parts = norm_p.split(os.sep)
+    try:
+        idx = parts.index('game')
+        header_parts = parts[:idx]
+        header = os.sep.join(header_parts)
+        if not header.endswith(os.sep):
+            header += os.sep
+
+        if os.path.exists(os.path.join(header, 'renpy')):
+            dic['header'] = os.path.join(header, 'game')
+            dic['subPath'] = os.sep.join(parts[idx+1:-1])
+            dic['fileName'] = parts[-1]
+            return dic
+    except Exception:
+        pass
+
+    dic['header'] = ''
+    return dic
 
 
 def ExtractWriteFile(p, tl_name, is_open_filter, filter_length, is_gen_empty, global_e, is_skip_underline):
@@ -507,16 +489,15 @@ def ExtractWriteFile(p, tl_name, is_open_filter, filter_length, is_gen_empty, gl
         return set()
     subPath = dic['subPath']
     fileName = dic['fileName']
-    targetDir = header + 'tl/' + tl_name + '/' + subPath
-    target = targetDir + fileName
-    if (os.path.exists(targetDir) == False):
-        try:
-            os.makedirs(targetDir)
-        except FileExistsError:
-            pass
-    if (os.path.isfile(target) == False):
+    targetDir = os.path.join(header, 'tl', tl_name, subPath)
+    target = os.path.join(targetDir, fileName)
+    if not os.path.exists(targetDir):
+        os.makedirs(targetDir, exist_ok=True)
+    if not os.path.isfile(target):
         open(target, 'w').close()
-    is_py2 = is_python2_from_game_dir(targetDir.rstrip('/').rstrip('\\') + '/../../../')
+
+    game_root = os.path.join(header, '..')
+    is_py2 = is_python2_from_game_dir(game_root)
     e = ExtractFromFile(p, is_open_filter, filter_length, is_skip_underline, is_py2)
     extractedSet = ExtractFromFile(target, False, 9999, is_skip_underline, is_py2)
     eDiff = e - extractedSet
@@ -552,21 +533,19 @@ def ExtractWriteFile(p, tl_name, is_open_filter, filter_length, is_gen_empty, gl
 
 
 def ExtractAllFilesInDir(dirName, is_open_filter, filter_length, is_gen_empty, is_skip_underline):
-    is_py2 = is_python2_from_game_dir(dirName + '/../../../')
+    game_root = os.path.join(dirName, '..', '..', '..')
+    is_py2 = is_python2_from_game_dir(game_root)
     CreateEmptyFileIfNotExsit(dirName)
     WriteExtracted(dirName, set(), is_open_filter, filter_length, is_gen_empty, is_skip_underline, is_py2)
     log_print('start removing repeated extraction, please waiting...')
     remove_repeat_extracted_from_tl(dirName, is_py2)
     cnt = 0
     get_extracted_set_list.clear()
-    p = dirName
-    if p[len(p) - 1] != '/' and p[len(p) - 1] != '\\':
-        p = p + '/'
-    paths = os.walk(p, topdown=False)
+    paths = os.walk(dirName, topdown=False)
     for path, dir_lst, file_lst in paths:
         for file_name in file_lst:
             i = os.path.join(path, file_name)
-            if file_name.endswith("rpy") == False:
+            if not file_name.endswith("rpy"):
                 continue
             t = ExtractTlThread(i, is_py2, True)
             get_extracted_threads.append(t)

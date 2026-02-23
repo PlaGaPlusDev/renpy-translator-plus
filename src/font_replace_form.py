@@ -1,8 +1,6 @@
-import _thread
 import os
 import subprocess
 import threading
-import time
 import traceback
 
 from PySide6.QtCore import QCoreApplication, QThread, Signal
@@ -10,80 +8,79 @@ from PySide6.QtWidgets import QDialog, QFileDialog
 
 from font_replace import Ui_FontReplaceDialog
 from my_log import log_print
+import my_log
 from renpy_fonts import GenGuiFonts
-from font_util import get_default_font_path
+from os_util import get_subprocess_creation_flags, open_file_with_text_editor
+
 
 class replaceFontThread(threading.Thread):
-    def __init__(self, select_dir, font_path, is_rtl_enabled):
+    def __init__(self, select_dir, font_path, is_rtl):
         threading.Thread.__init__(self)
         self.select_dir = select_dir
         self.font_path = font_path
-        self.is_rtl_enabled = is_rtl_enabled
-
+        self.is_rtl = is_rtl
 
     def run(self):
         try:
-            log_print('start replace font ...')
-            GenGuiFonts(self.select_dir, self.font_path, self.is_rtl_enabled)
-            log_print('replace complete!')
+            log_print('start replace font...')
+            GenGuiFonts(self.select_dir, self.font_path, self.is_rtl)
+            log_print('replace font complete!')
         except Exception as e:
             msg = traceback.format_exc()
             log_print(msg)
+
 
 class MyFontReplaceForm(QDialog, Ui_FontReplaceDialog):
     def __init__(self, parent=None):
         super(MyFontReplaceForm, self).__init__(parent)
         self.setupUi(self)
-        self.selectDirBtn_3.clicked.connect(self.select_directory3)
-        self.selectFontBtn.clicked.connect(self.select_font)
-        self.replaceFontBtn.clicked.connect(self.replaceFont)
-        self.openFontStyleBtn.clicked.connect(self.openFontStyleFile)
         self.setFixedHeight(self.height())
         self.setFixedWidth(self.width())
-        default_font = get_default_font_path()
-        if default_font is not None:
-            self.selectFontText.setText(default_font)
+        self.selectDirBtn.clicked.connect(self.select_directory)
+        self.selectFontBtn.clicked.connect(self.select_font)
+        self.replaceBtn.clicked.connect(self.replace_font)
+        self.openGuiBtn.clicked.connect(self.open_gui_rpy)
         self.replace_font_thread = None
-        _thread.start_new_thread(self.update, ())
+        _thread = threading.Thread(target=self.update)
+        _thread.daemon = True
+        _thread.start()
 
-    def select_directory3(self):
-        directory = QFileDialog.getExistingDirectory(self, QCoreApplication.translate("FontReplaceDialog", "select the directory you want to extract", None))
-        self.selectDirText_3.setText(directory)
+    def select_directory(self):
+        directory = QFileDialog.getExistingDirectory(self, QCoreApplication.translate('MainWindow',
+                                                                                      'select the directory you want to translate',
+                                                                                      None))
+        self.selectDirText.setText(directory)
 
     def select_font(self):
         file, filetype = QFileDialog.getOpenFileName(self,
-                                                     QCoreApplication.translate("FontReplaceDialog", "select the file font which supports the translated language", None),
+                                                     QCoreApplication.translate("FontReplaceDialog",
+                                                                                "select the file font which supports the translated language",
+                                                                                None),
                                                      '',
-                                                     "Font Files (*.ttf || *.otf || *.ttc || *.otc || *.woff || *.woff2);;All Files (*)")
+                                                     "Font Files (*.ttf || *.otf);;All Files (*)")
         self.selectFontText.setText(file)
 
-    def replaceFont(self):
-        select_dir = self.selectDirText_3.toPlainText()
+    def replace_font(self):
+        select_dir = self.selectDirText.toPlainText()
+        select_dir = select_dir.replace('file:///', '')
         if len(select_dir) > 0:
-            select_dir = select_dir.replace('file:///', '')
-            if not os.path.exists(select_dir):
-                log_print(select_dir + ' directory does not exist!')
-            else:
-                if select_dir[len(select_dir) - 1] != '/' and select_dir[len(select_dir) - 1] != '\\':
-                    select_dir = select_dir + '/'
-                font_path = self.selectFontText.toPlainText()
-                font_path = font_path.replace('file:///', '')
-                t = replaceFontThread(select_dir, font_path, self.rtlCheckBox.isChecked())
-                self.replace_font_thread = t
-                t.start()
-                self.setDisabled(True)
-                self.replaceFontBtn.setText(QCoreApplication.translate('FontReplaceDialog', 'is replacing font...', None))
-
-    def openFontStyleFile(self):
-        select_dir = self.selectDirText_3.toPlainText()
-        if len(select_dir) > 0:
-            select_dir = select_dir.replace('file:///', '')
             if select_dir[len(select_dir) - 1] != '/' and select_dir[len(select_dir) - 1] != '\\':
                 select_dir = select_dir + '/'
-            command = 'notepad ' + '"' + select_dir + 'gui.rpy' + '"'
-            p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 creationflags=0x08000000, text=True, encoding='utf-8')
-            p.wait()
+            font_path = self.selectFontText.toPlainText()
+            font_path = font_path.replace('file:///', '')
+            t = replaceFontThread(select_dir, font_path, self.rtlCheckBox.isChecked())
+            self.replace_font_thread = t
+            t.start()
+            self.setDisabled(True)
+            self.replaceBtn.setText(QCoreApplication.translate('FontReplaceDialog', 'is replacing font...', None))
+
+    def open_gui_rpy(self):
+        select_dir = self.selectDirText.toPlainText()
+        select_dir = select_dir.replace('file:///', '')
+        if len(select_dir) > 0:
+            if select_dir[len(select_dir) - 1] != '/' and select_dir[len(select_dir) - 1] != '\\':
+                select_dir = select_dir + '/'
+            open_file_with_text_editor(os.path.join(select_dir, 'gui.rpy'))
 
     def update(self):
         thread = self.UpdateThread()
@@ -96,7 +93,7 @@ class MyFontReplaceForm(QDialog, Ui_FontReplaceDialog):
         try:
             if self.replace_font_thread is not None:
                 if not self.replace_font_thread.is_alive():
-                    self.replaceFontBtn.setText(QCoreApplication.translate('FontReplaceDialog', 'replace font', None))
+                    self.replaceBtn.setText(QCoreApplication.translate('FontReplaceDialog', 'replace font', None))
                     self.setEnabled(True)
                     self.replace_font_thread = None
 

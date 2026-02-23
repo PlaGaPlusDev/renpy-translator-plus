@@ -2,6 +2,7 @@ import _thread
 import os
 import threading
 import time
+import platform
 import traceback
 
 from PySide6.QtCore import QCoreApplication, QThread, Signal
@@ -45,7 +46,7 @@ class MyErrorRepairForm(QDialog, Ui_ErrorRepairDialog):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
         if os.path.isfile(path):
-            if path.endswith('.exe'):
+            if path.endswith('.exe') or path.endswith('.sh') or (platform.system() == 'Linux' and os.access(path, os.X_OK)):
                 t = repairThread(path, int(self.maxRecursionLineEdit.text()))
                 self.repair_thread = t
                 t.start()
@@ -53,7 +54,7 @@ class MyErrorRepairForm(QDialog, Ui_ErrorRepairDialog):
                 self.repairBtn.setText(QCoreApplication.translate('ErrorRepairDialog', 'is repairing...', None))
 
     def select_file(self):
-        file, filetype = QFileDialog.getOpenFileName(self, 'select the game file', '', "Game Files (*.exe)")
+        file, filetype = QFileDialog.getOpenFileName(self, 'select the game file', '', "Game Files (*.exe *.sh);;All Files (*)")
         self.selectFileText.setText(file)
 
     def update(self):

@@ -8,8 +8,13 @@ import subprocess
 import time
 import traceback
 import webbrowser
+import platform
 
-import win32gui
+try:
+    import win32gui
+except ImportError:
+    win32gui = None
+
 from PySide6.QtCore import QCoreApplication, QThread, Signal
 from PySide6.QtGui import QIcon, QIntValidator
 from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
@@ -35,6 +40,7 @@ from font_replace_form import replaceFontThread
 import default_language_form
 from error_repair_form import repairThread
 from translated_form import MyTranslatedForm
+from os_util import get_subprocess_creation_flags
 
 
 class MyQueue(queue.Queue):
@@ -102,6 +108,15 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
         self.overwriteCheckBox.setChecked(not is_skip_if_exist)
         _thread.start_new_thread(self.update, ())
 
+    def is_game_file(self, path):
+        if not path or not os.path.isfile(path):
+            return False
+        if path.endswith('.exe') or path.endswith('.sh'):
+            return True
+        if platform.system() == 'Linux' and os.access(path, os.X_OK):
+            return True
+        return False
+
     def on_tl_path_changed(self):
         if os.path.isfile('engine.txt'):
             json_file = open('engine.txt', 'r',encoding='utf-8')
@@ -149,12 +164,11 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
     def repair(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if os.path.isfile(path):
-            if path.endswith('.exe'):
-                t = repairThread(path, int(self.maxRecursionLineEdit.text()))
-                self.repair_thread = t
-                t.start()
-                self.setDisabled(True)
+        if self.is_game_file(path):
+            t = repairThread(path, int(self.maxRecursionLineEdit.text()))
+            self.repair_thread = t
+            t.start()
+            self.setDisabled(True)
 
     def set_default_language(self):
         tl_name = self.tlNameText.toPlainText()
@@ -167,13 +181,12 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
     def get_set_default_language_target(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if os.path.isfile(path):
-            if path.endswith('.exe'):
-                target = os.path.dirname(path)
-                target = target + '/game'
-                if os.path.isdir(target):
-                    target = target + '/' + default_language_form.out_default_lanugage_script_name
-                    return target
+        if self.is_game_file(path):
+            target = os.path.dirname(path)
+            target = os.path.join(target, 'game')
+            if os.path.isdir(target):
+                target = os.path.join(target, default_language_form.out_default_lanugage_script_name)
+                return target
         return None
 
 
@@ -188,12 +201,11 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                 is_finished = True
                 self.qDic[self.official_extract] = is_finished, is_executed
                 return
-            if os.path.isfile(select_file):
-                if select_file.endswith('.exe'):
-                    t = extraction_official_form.extractThread(select_file, tl_name, False, False)
-                    self.official_extract_thread = t
-                    t.start()
-                    self.setDisabled(True)
+            if self.is_game_file(select_file):
+                t = extraction_official_form.extractThread(select_file, tl_name, False, False)
+                self.official_extract_thread = t
+                t.start()
+                self.setDisabled(True)
 
     def translate(self):
         if os.path.isfile(web_brower_export_name):
@@ -208,7 +220,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                 is_finished = True
                 self.qDic[self.translate] = is_finished, is_executed
                 return
-            select_dir = os.path.dirname(select_file) + '/game/tl/' + tl_name
+            select_dir = os.path.join(os.path.dirname(select_file), 'game', 'tl', tl_name)
             self.select_dir = select_dir
             if not os.path.exists(select_dir):
                 log_print(select_dir + ' directory does not exist!')
@@ -216,8 +228,6 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                 is_finished = True
                 self.qDic[self.translate] = is_finished, is_executed
             else:
-                if select_dir[len(select_dir) - 1] != '/' and select_dir[len(select_dir) - 1] != '\\':
-                    select_dir = select_dir + '/'
                 paths = os.walk(select_dir, topdown=False)
                 cnt = 0
                 target_language = ''
@@ -283,13 +293,12 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
     def get_add_entrance_target(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if os.path.isfile(path):
-            if path.endswith('.exe'):
-                target = os.path.dirname(path)
-                target = target + '/game'
-                if os.path.isdir(target):
-                    target = target + '/' + add_change_language_entrance_form.hook_script
-                    return target
+        if self.is_game_file(path):
+            target = os.path.dirname(path)
+            target = os.path.join(target, 'game')
+            if os.path.isdir(target):
+                target = os.path.join(target, add_change_language_entrance_form.hook_script)
+                return target
         return None
 
     def replaceFont(self):
@@ -303,12 +312,10 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                 is_finished = True
                 self.qDic[self.replaceFont] = is_finished, is_executed
                 return
-            select_dir = os.path.dirname(select_file) + '/game/tl/' + tl_name
+            select_dir = os.path.join(os.path.dirname(select_file), 'game', 'tl', tl_name)
             if not os.path.exists(select_dir):
                 log_print(select_dir + ' directory does not exist!')
             else:
-                if select_dir[len(select_dir) - 1] != '/' and select_dir[len(select_dir) - 1] != '\\':
-                    select_dir = select_dir + '/'
                 font_path = self.selectFontText.toPlainText()
                 font_path = font_path.replace('file:///', '')
                 t = replaceFontThread(select_dir, font_path, self.rtlCheckBox.isChecked())
@@ -336,12 +343,10 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                     is_finished = True
                     self.qDic[self.extract] = is_finished, is_executed
                     return
-                select_dir = os.path.dirname(select_file) + '/game/tl/' + tl_name
+                select_dir = os.path.join(os.path.dirname(select_file), 'game', 'tl', tl_name)
                 if not os.path.exists(select_dir):
                     log_print(select_dir + ' directory does not exist!')
                 else:
-                    if select_dir[len(select_dir) - 1] != '/' and select_dir[len(select_dir) - 1] != '\\':
-                        select_dir = select_dir + '/'
                     t = renpy_extract.extractThread(threadID=0, p=None, tl_name=tl_name, dirs=None, tl_dir=select_dir,
                                                     is_open_filter=self.filterCheckBox.isChecked(),
                                                     filter_length=int(self.filterLengthLineEdit.text()),
@@ -393,16 +398,15 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
             is_finished = True
             self.qDic[self.runtime_extract] = is_finished, is_executed
             return
-        if os.path.isfile(path):
-            if path.endswith('.exe'):
-                is_finished, is_executed = self.qDic[self.runtime_extract]
-                is_finished = False
-                self.qDic[self.runtime_extract] = is_finished, is_executed
-                log_print('start runtime extract...')
-                t = extract_runtime_form.extractThread(path, tl_name, False, False)
-                t.start()
-                self.setDisabled(True)
-                return
+        if self.is_game_file(path):
+            is_finished, is_executed = self.qDic[self.runtime_extract]
+            is_finished = False
+            self.qDic[self.runtime_extract] = is_finished, is_executed
+            log_print('start runtime extract...')
+            t = extract_runtime_form.extractThread(path, tl_name, False, False)
+            t.start()
+            self.setDisabled(True)
+            return
         is_finished, is_executed = self.qDic[self.runtime_extract]
         is_finished = True
         self.qDic[self.runtime_extract] = is_finished, is_executed
@@ -421,41 +425,40 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
     def unpack(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if os.path.isfile(path):
-            if path.endswith('.exe'):
-                dir = os.path.dirname(path)
-                #shutil.copyfile(game_unpacker_form.hook_script, dir + '/game/' + game_unpacker_form.hook_script)
-                f = io.open(game_unpacker_form.hook_script, mode='r', encoding='utf-8')
-                _read_lines = f.readlines()
-                f.close()
-                for idx, _line in enumerate(_read_lines):
-                    if _line.startswith('    MAX_UNPACK_THREADS = '):
-                        _read_lines[idx] = f'    MAX_UNPACK_THREADS = {self.maxThreadsLineEdit.text()}\n'
-                        break
-                for idx, _line in enumerate(_read_lines):
-                    if _line.startswith('    SCRIPT_ONLY = '):
-                        _read_lines[idx] = f'    SCRIPT_ONLY = {str(not self.unpackAllCheckBox.isChecked())}\n'
-                        break
-                for idx, _line in enumerate(_read_lines):
-                    if _line.startswith('    SKIP_IF_EXIST = '):
-                        _read_lines[idx] = f'    SKIP_IF_EXIST = {str(not self.overwriteCheckBox.isChecked())}\n'
-                        break
-                f = io.open(dir + '/game/' + game_unpacker_form.hook_script, mode='w', encoding='utf-8')
-                f.writelines(_read_lines)
-                f.close()
-                f = io.open(game_unpacker_form.hook_script, mode='w', encoding='utf-8')
-                f.writelines(_read_lines)
-                f.close()
-                command = '"' +path+'"'
-                self.path = path
-                f = io.open(dir + finish_flag, 'w')
-                f.write('waiting')
-                f.close()
-                self.setDisabled(True)
-                log_print('start unpacking...')
-                p = subprocess.Popen(command, shell=True, stdout=my_log.f, stderr=my_log.f,
-                                     creationflags=0x08000000, text=True, cwd=dir, encoding='utf-8')
-                return
+        if self.is_game_file(path):
+            dir = os.path.dirname(path)
+            #shutil.copyfile(game_unpacker_form.hook_script, dir + '/game/' + game_unpacker_form.hook_script)
+            f = io.open(game_unpacker_form.hook_script, mode='r', encoding='utf-8')
+            _read_lines = f.readlines()
+            f.close()
+            for idx, _line in enumerate(_read_lines):
+                if _line.startswith('    MAX_UNPACK_THREADS = '):
+                    _read_lines[idx] = f'    MAX_UNPACK_THREADS = {self.maxThreadsLineEdit.text()}\n'
+                    break
+            for idx, _line in enumerate(_read_lines):
+                if _line.startswith('    SCRIPT_ONLY = '):
+                    _read_lines[idx] = f'    SCRIPT_ONLY = {str(not self.unpackAllCheckBox.isChecked())}\n'
+                    break
+            for idx, _line in enumerate(_read_lines):
+                if _line.startswith('    SKIP_IF_EXIST = '):
+                    _read_lines[idx] = f'    SKIP_IF_EXIST = {str(not self.overwriteCheckBox.isChecked())}\n'
+                    break
+            f = io.open(os.path.join(dir, 'game', game_unpacker_form.hook_script), mode='w', encoding='utf-8')
+            f.writelines(_read_lines)
+            f.close()
+            f = io.open(game_unpacker_form.hook_script, mode='w', encoding='utf-8')
+            f.writelines(_read_lines)
+            f.close()
+            command = '"' +path+'"'
+            self.path = path
+            f = io.open(os.path.join(dir, finish_flag), 'w')
+            f.write('waiting')
+            f.close()
+            self.setDisabled(True)
+            log_print('start unpacking...')
+            p = subprocess.Popen(command, shell=True, stdout=my_log.f, stderr=my_log.f,
+                                 creationflags=get_subprocess_creation_flags(), text=True, cwd=dir, encoding='utf-8')
+            return
         is_finished, is_executed = self.qDic[self.unpack]
         is_finished = True
         self.qDic[self.unpack] = is_finished, is_executed
@@ -626,7 +629,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                                                                                 'select the game file',
                                                                                 None),
                                                      '',
-                                                     "Game Files (*.exe)")
+                                                     "Game Files (*.exe *.sh);;All Files (*)")
         self.selectFileText.setText(file)
 
     def update(self):
@@ -639,8 +642,8 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
     def update_progress(self):
         try:
             if self.dir is not None:
-                if os.path.isfile(self.dir + '/unren.finish'):
-                    os.remove(self.dir + '/unren.finish')
+                if os.path.isfile(os.path.join(self.dir, 'unren.finish')):
+                    os.remove(os.path.join(self.dir, 'unren.finish'))
                     self.dir = None
                     is_finished, is_executed = self.qDic[self.unpack]
                     is_finished = True
@@ -656,15 +659,15 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                         self.qDic[self.runtime_extract] = is_finished, is_executed
             if self.path is not None:
                 dir = os.path.dirname(self.path)
-                target = dir + finish_flag
+                target = os.path.join(dir, finish_flag)
                 if not os.path.isfile(target):
-                    hook_script_path = dir + '/game/' + game_unpacker_form.hook_script
+                    hook_script_path = os.path.join(dir, 'game', game_unpacker_form.hook_script)
                     if os.path.isfile(hook_script_path):
                         os.remove(hook_script_path)
                     if os.path.isfile(hook_script_path + 'c'):
                         os.remove(hook_script_path + 'c')
                     pid = None
-                    target = dir + game_unpacker_form.pid_flag
+                    target = os.path.join(dir, game_unpacker_form.pid_flag)
                     if os.path.isfile(target):
                         f = io.open(target, 'r', encoding='utf-8')
                         pid = f.read()
@@ -737,7 +740,7 @@ class MyOneKeyTranslateForm(QDialog, Ui_OneKeyTranslateDialog):
                                                 paths = os.walk(self.select_dir, topdown=False)
                                                 for path, dir_lst, file_lst in paths:
                                                     for file_name in file_lst:
-                                                        i = path + '/' + file_name
+                                                        i = os.path.join(path, file_name)
                                                         if not file_name.endswith("rpy"):
                                                             continue
                                                         if i in rpy_info_dic.keys():

@@ -1,5 +1,6 @@
 import os.path
 import shutil
+import platform
 
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QDialog, QFileDialog
@@ -19,6 +20,15 @@ class MyAddChangeLanguageEntranceForm(QDialog, Ui_AddEntranceDialog):
         self.selectFileText.textChanged.connect(self.on_text_changed)
         self.addEntranceCheckBox.clicked.connect(self.on_add_entrance_checkbox_clicked)
 
+    def is_game_file(self, path):
+        if not path or not os.path.isfile(path):
+            return False
+        if path.endswith('.exe') or path.endswith('.sh'):
+            return True
+        if platform.system() == 'Linux' and os.access(path, os.X_OK):
+            return True
+        return False
+
     def on_add_entrance_checkbox_clicked(self):
         if self.addEntranceCheckBox.isChecked():
             target = self.get_target()
@@ -37,14 +47,13 @@ class MyAddChangeLanguageEntranceForm(QDialog, Ui_AddEntranceDialog):
     def get_target(self):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
-        if os.path.isfile(path):
-            if path.endswith('.exe'):
-                target = os.path.dirname(path)
-                target = target + '/game'
-                if os.path.isdir(target):
-                    target = target + '/' + hook_script
-                    return target
+        if self.is_game_file(path):
+            target = os.path.join(os.path.dirname(path), 'game')
+            if os.path.isdir(target):
+                target = os.path.join(target, hook_script)
+                return target
         return None
+
     def on_text_changed(self):
         target = self.get_target()
         if target is not None and os.path.isfile(target):
@@ -58,5 +67,5 @@ class MyAddChangeLanguageEntranceForm(QDialog, Ui_AddEntranceDialog):
                                                                                 'select the game file you want to add entrance',
                                                                                 None),
                                                      '',
-                                                     "Game Files (*.exe)")
+                                                     "Game Files (*.exe *.sh);;All Files (*)")
         self.selectFileText.setText(file)

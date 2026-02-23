@@ -10,23 +10,22 @@ def is_64_bit():
 
 
 def get_python_path_from_game_dir(game_dir):
-    lib_list_64 = ['windows-x86_64', 'py2-windows-x86_64', 'py3-windows-x86_64']
-    lib_list_86 = ['windows-i686', 'py2-windows-i686', 'py3-windows-i686']
+    lib_list_64 = ['windows-x86_64', 'py2-windows-x86_64', 'py3-windows-x86_64', 'linux-x86_64', 'linux-i686']
+    lib_list_86 = ['windows-i686', 'py2-windows-i686', 'py3-windows-i686', 'linux-i686']
     python_path = None
+
+    executable_names = ['python.exe', 'python']
+
+    search_list = lib_list_64 if is_64_bit() else lib_list_86
     if is_64_bit():
-        lib_list_64.extend(lib_list_86)
-        for i in lib_list_64:
-            target = game_dir + 'lib/' + i + '/python.exe'
+        search_list.extend(lib_list_86)
+
+    for lib_dir in search_list:
+        for exe_name in executable_names:
+            target = os.path.join(game_dir, 'lib', lib_dir, exe_name)
             if os.path.isfile(target):
-                python_path = target
-                break
-    else:
-        for i in lib_list_86:
-            target = game_dir + 'lib/' + i + '/python.exe'
-            if os.path.isfile(target):
-                python_path = target
-                break
-    return python_path
+                return target
+    return None
 
 
 def get_python_path_from_game_path(game_path):
@@ -72,9 +71,20 @@ def copy_files_under_directory_to_directory(src_dir, desc_dir):
 
 
 def get_game_path_from_game_dir(game_dir):
+    extensions = ['.exe', '.sh']
     for item in os.listdir(game_dir):
         full_path = os.path.join(game_dir, item)
-        if os.path.isfile(full_path) and item.lower().endswith('.exe'):
-            if os.path.isfile(full_path[:-len('.exe')] + '.py'):
-                return full_path
+        if os.path.isfile(full_path):
+            lower_item = item.lower()
+            for ext in extensions:
+                if lower_item.endswith(ext):
+                    # For Ren'Py, there is usually a .py file with the same name as the executable
+                    py_file = full_path[:-len(ext)] + '.py'
+                    if os.path.isfile(py_file):
+                        return full_path
+            # On Linux, sometimes the binary has no extension and is executable
+            if platform.system() == "Linux" and os.access(full_path, os.X_OK):
+                py_file = full_path + '.py'
+                if os.path.isfile(py_file):
+                    return full_path
     return None

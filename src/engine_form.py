@@ -14,6 +14,7 @@ from engine import Ui_EngineDialog
 from my_log import log_print
 from renpy_translate import engineDic, engineList
 import openai_translate
+from os_util import open_file_with_text_editor
 
 
 def get_ping_host(ip):
@@ -95,10 +96,7 @@ class MyEngineForm(QDialog, Ui_EngineDialog):
 
     def custom_prompt(self):
         if os.path.isfile(openai_translate.openai_template_file):
-            command = 'notepad ' + openai_translate.openai_template_file
-            p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 creationflags=0x08000000, text=True, encoding='utf-8')
-            p.wait()
+            open_file_with_text_editor(openai_translate.openai_template_file)
 
     def detect_network_thread(self, engine, url):
         delay = -1
@@ -132,10 +130,7 @@ class MyEngineForm(QDialog, Ui_EngineDialog):
 
     def on_custom_button_clicked(self):
         if os.path.isfile('openai_model.txt'):
-            command = 'notepad ' + 'openai_model.txt'
-            p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 creationflags=0x08000000, text=True, encoding='utf-8')
-            p.wait()
+            open_file_with_text_editor('openai_model.txt')
             self.init_openai_model_combobox()
 
     def init_edit_status(self):

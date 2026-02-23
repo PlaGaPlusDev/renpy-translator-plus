@@ -24,6 +24,7 @@ from PySide6.QtWidgets import QFileDialog, QListView, QAbstractItemView, QTreeVi
 from html_util import open_directory_and_select_file
 from string_tool import EncodeBrackets, isAllPunctuations, tail
 from translated_form import MyTranslatedForm
+from os_util import kill_process, open_file_with_text_editor, get_system_language
 
 os.environ['REQUESTS_CA_BUNDLE'] = os.path.join(os.path.dirname(sys.argv[0]), 'cacert.pem')
 os.environ['NO_PROXY'] = '*'
@@ -474,8 +475,7 @@ class MyMainForm(QMainWindow, Ui_MainWindow):
             event.ignore()
             return
 
-        CREATE_NO_WINDOW = 0x08000000
-        subprocess.call(['taskkill.exe', '/F', '/T', '/PID', str(os.getpid())], creationflags=CREATE_NO_WINDOW)
+        kill_process(os.getpid())
 
     def show_engine_settings(self):
         engine_form = MyEngineForm(parent=self)
@@ -718,10 +718,7 @@ class MyMainForm(QMainWindow, Ui_MainWindow):
                 f = io.open(log_path, 'w')
                 f.write('Log Format UnicodeEncodeError! Log Cleared')
                 f.close()
-                command = 'notepad ' + log_path + '.error.txt'
-                p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                     creationflags=0x08000000, text=True, encoding='utf-8')
-                p.wait()
+                open_file_with_text_editor(log_path + '.error.txt')
 
     def select_file(self):
         files, filetype = QFileDialog.getOpenFileNames(self,
@@ -820,8 +817,7 @@ class MyMainForm(QMainWindow, Ui_MainWindow):
 
 
 def get_default_langauge():
-    dll_h = ctypes.windll.kernel32
-    language_code = hex(dll_h.GetSystemDefaultUILanguage())
+    language_code = get_system_language()
     language_dic = {
         '401': 'arabic', '0x845': 'bengali', '0x445': 'bengali', '0x804': 'chinese', '0xc04': 'chinese',
         '0x404': 'chinese',
