@@ -22,8 +22,9 @@ def get_renpy_cmd(game_path):
 
 def exec_renpy_lint(game_path):
     command = get_renpy_cmd(game_path)
+    from os_util import get_subprocess_creation_flags
     p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                         creationflags=0x08000000, text=True, encoding='utf-8')
+                         creationflags=get_subprocess_creation_flags(), text=True, encoding='utf-8')
     p.wait()
 
 

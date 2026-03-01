@@ -100,4 +100,5 @@ def plain_text_to_html(p, output_p, is_replace_special_symbols):
 
 
 def open_directory_and_select_file(file_path):
-    subprocess.run(["explorer", "/select,", os.path.normpath(file_path)])
+    from os_util import open_directory_and_select_file as os_open_dir
+    os_open_dir(file_path)

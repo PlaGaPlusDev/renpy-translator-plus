@@ -7,6 +7,7 @@ import subprocess
 import threading
 import time
 import traceback
+import platform
 
 from PySide6.QtCore import QCoreApplication, QThread, Signal
 from PySide6.QtWidgets import QDialog, QFileDialog
@@ -15,6 +16,7 @@ from extraction_runtime import Ui_ExtractionRuntimeDialog
 from my_log import log_print
 from html_util import open_directory_and_select_file
 from string_tool import encode_say_string
+from os_util import get_subprocess_creation_flags, is_game_file
 
 hook_script = 'hook_extract.rpy'
 hooked_result = 'extraction_hooked.json'
@@ -41,24 +43,31 @@ class extractThread(threading.Thread):
             tl_name = self.tl_name
             is_gen_empty = self.is_gen_empty
             dir = os.path.dirname(path)
-            target = dir + '/game/' + hook_script
+            target = os.path.join(dir, 'game', hook_script)
+            if not os.path.exists(os.path.dirname(target)):
+                os.makedirs(os.path.dirname(target), exist_ok=True)
             shutil.copyfile(hook_script, target)
-            command = 'start "" /wait /d "' + dir + '"  "' + path + '"'
+
+            if platform.system() == "Windows":
+                command = 'start "" /wait /d "' + dir + '"  "' + path + '"'
+            else:
+                command = '"' + path + '"'
+
             self.path = path
             p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 creationflags=0x08000000, text=True, encoding='utf-8')
+                                 creationflags=get_subprocess_creation_flags(), text=True, cwd=dir, encoding='utf-8')
             p.wait()
 
-            target = dir + '/' + hooked_result
+            target = os.path.join(dir, hooked_result)
             while True:
                 if os.path.isfile(target) and os.path.getsize(target) > 0:
-                    target = dir + '/game/' + hook_script
-                    if os.path.exists(target):
-                        os.remove(target)
-                    target = target + 'c'
-                    if os.path.exists(target):
-                        os.remove(target)
-                    target = dir + '/' + hooked_result
+                    hook_target = os.path.join(dir, 'game', hook_script)
+                    if os.path.exists(hook_target):
+                        os.remove(hook_target)
+                    hook_target_c = hook_target + 'c'
+                    if os.path.exists(hook_target_c):
+                        os.remove(hook_target_c)
+                    target = os.path.join(dir, hooked_result)
                     break
                 time.sleep(1)
             if os.path.isfile(target):
@@ -69,10 +78,10 @@ class extractThread(threading.Thread):
                 for key, value in dic.items():
                     value.sort(key=get_line_number)
                     if key.startswith('game/'):
-                        target = key[:5] + 'tl/' + tl_name + '/' + key[5:]
+                        rel_path = key[5:]
                     else:
-                        target = 'game/tl/' + tl_name + '/' + key
-                    target = dir + '/' + target
+                        rel_path = key
+                    target = os.path.join(dir, 'game', 'tl', tl_name, rel_path)
                     target_dir = os.path.dirname(target)
                     target = os.path.splitext(target)[0] + '.rpy'
                     if not os.path.exists(target_dir):
@@ -97,7 +106,6 @@ class extractThread(threading.Thread):
                                 f.write(f'    {who}""\n')
                             else:
                                 f.write(f'    {who}"{what}"\n')
-                            # print(f'who:{who} what:{what} {key} {linenumber}')
                         f.close()
                     else:
                         f = io.open(target, 'r', encoding='utf-8')
@@ -130,7 +138,6 @@ class extractThread(threading.Thread):
                                 f.write(f'    {who}""\n')
                             else:
                                 f.write(f'    {who}"{what}"\n')
-                            # print(f'who:{who} what:{what} {key} {linenumber}')
                         f.close()
                 if self.is_show_directory:
                     open_directory_and_select_file(target)
@@ -161,11 +168,10 @@ class MyExtractionRuntimeForm(QDialog, Ui_ExtractionRuntimeDialog):
         if len(tl_name) == 0:
             log_print('tl_name should not be empty')
             return
-        if os.path.isfile(path):
-            if path.endswith('.exe'):
-                t = extractThread(path, tl_name, self.emptyCheckBox.isChecked(), True)
-                t.start()
-                self.setDisabled(True)
+        if is_game_file(path):
+            t = extractThread(path, tl_name, self.emptyCheckBox.isChecked(), True)
+            t.start()
+            self.setDisabled(True)
 
     def select_file(self):
         file, filetype = QFileDialog.getOpenFileName(self,
@@ -173,7 +179,7 @@ class MyExtractionRuntimeForm(QDialog, Ui_ExtractionRuntimeDialog):
                                                                                 'select the game file you want to extract',
                                                                                 None),
                                                      '',
-                                                     "Game Files (*.exe)")
+                                                     "Game Files (*.exe *.sh);;All Files (*)")
         self.selectFileText.setText(file)
 
     def update(self):

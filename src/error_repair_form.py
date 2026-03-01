@@ -2,27 +2,29 @@ import _thread
 import os
 import threading
 import time
+import platform
 import traceback
 
 from PySide6.QtCore import QCoreApplication, QThread, Signal
-from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import QDialog, QFileDialog
 
 from error_repair import Ui_ErrorRepairDialog
 from my_log import log_print
 from renpy_lint import fix_translation_by_lint_recursion
+from os_util import is_game_file
 
 
 class repairThread(threading.Thread):
-    def __init__(self, path, max_recursion_depth):
+    def __init__(self, path, max_recursion):
         threading.Thread.__init__(self)
         self.path = path
-        self.max_recursion_depth = max_recursion_depth
+        self.max_recursion = max_recursion
 
     def run(self):
         try:
-            log_print('start repairing ...')
-            fix_translation_by_lint_recursion(self.path, self.max_recursion_depth)
+            log_print('start repair...')
+            fix_translation_by_lint_recursion(self.path, self.max_recursion)
+            log_print('repair complete!')
         except Exception as e:
             msg = traceback.format_exc()
             log_print(msg)
@@ -36,8 +38,6 @@ class MyErrorRepairForm(QDialog, Ui_ErrorRepairDialog):
         self.setFixedWidth(self.width())
         self.selectFileBtn.clicked.connect(self.select_file)
         self.repairBtn.clicked.connect(self.repair)
-        self.maxRecursionLineEdit.setValidator(QIntValidator(1, 65535, self))
-        self.maxRecursionLineEdit.setText('32')
         self.repair_thread = None
         _thread.start_new_thread(self.update, ())
 
@@ -45,7 +45,7 @@ class MyErrorRepairForm(QDialog, Ui_ErrorRepairDialog):
         path = self.selectFileText.toPlainText()
         path = path.replace('file:///', '')
         if os.path.isfile(path):
-            if path.endswith('.exe'):
+            if is_game_file(path):
                 t = repairThread(path, int(self.maxRecursionLineEdit.text()))
                 self.repair_thread = t
                 t.start()
@@ -53,7 +53,7 @@ class MyErrorRepairForm(QDialog, Ui_ErrorRepairDialog):
                 self.repairBtn.setText(QCoreApplication.translate('ErrorRepairDialog', 'is repairing...', None))
 
     def select_file(self):
-        file, filetype = QFileDialog.getOpenFileName(self, 'select the game file', '', "Game Files (*.exe)")
+        file, filetype = QFileDialog.getOpenFileName(self, 'select the game file', '', "Game Files (*.exe *.sh);;All Files (*)")
         self.selectFileText.setText(file)
 
     def update(self):
@@ -67,10 +67,10 @@ class MyErrorRepairForm(QDialog, Ui_ErrorRepairDialog):
         try:
             if self.repair_thread is not None:
                 if not self.repair_thread.is_alive():
-                    self.repairBtn.setText(QCoreApplication.translate('ErrorRepairDialog', 'repair errors', None))
+                    self.repairBtn.setText(QCoreApplication.translate('ErrorRepairDialog', 'repair', None))
                     self.setEnabled(True)
                     self.repair_thread = None
-                    log_print('error repair complete!')
+
         except Exception:
             msg = traceback.format_exc()
             log_print(msg)
